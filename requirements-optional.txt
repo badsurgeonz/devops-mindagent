@@ -1,0 +1,17 @@
+# 可选依赖：按功能启用
+# 生产环境按需安装，Demo 本地不强制
+
+# 向量库
+chromadb>=0.5
+
+# BGE 模型（较重，建议部署到独立推理服务后仅保留 HTTP 客户端）
+sentence-transformers>=3.0
+
+# Kafka 异步审计
+aiokafka>=0.11
+
+# MySQL 驱动（sync SQLAlchemy）
+pymysql>=1.1
+
+# PDF 文档解析
+pypdf>=4.0

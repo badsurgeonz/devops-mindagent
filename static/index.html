@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DevOps-MindAgent</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --fg: #e6edf3;
+    --muted: #8b949e; --accent: #2f81f7; --ok: #3fb950; --warn: #d29922;
+    --err: #f85149; --tool: #a371f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; }
+  #mode { color: var(--ok); }
+  header .spacer { flex: 1; }
+  #logout { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  main { flex: 1; overflow-y: auto; padding: 20px; }
+  .chat { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; flex-direction: column; gap: 6px; }
+  .role { font-size: 12px; color: var(--muted); }
+  .user .bubble { background: #1f6feb33; border: 1px solid #1f6feb66; }
+  .assistant .bubble { background: var(--panel); border: 1px solid var(--border); }
+  .bubble { border-radius: 10px; padding: 12px 14px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; font-size: 14px; }
+  .info { font-size: 13px; color: var(--warn); }
+  .thought { font-size: 13px; color: var(--accent); font-style: italic; }
+  .toolcard { border: 1px solid var(--tool); border-left: 3px solid var(--tool); border-radius: 8px; padding: 8px 12px; background: #a371f733; font-size: 13px; }
+  .toolcard .tname { color: var(--tool); font-weight: 600; }
+  .toolcard pre { white-space: pre-wrap; word-break: break-word; margin-top: 6px; color: var(--fg); font-size: 12px; }
+  .err { color: var(--err); }
+  .cursor { display: inline-block; width: 8px; background: var(--accent); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .quick { max-width: 860px; margin: 14px auto 0; display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px; }
+  .quick button { background: var(--panel); border: 1px solid var(--border); color: var(--fg); padding: 6px 12px; border-radius: 16px; cursor: pointer; font-size: 13px; }
+  .quick button:hover { border-color: var(--accent); }
+  footer { border-top: 1px solid var(--border); padding: 14px 20px; }
+  .inputbar { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; }
+  #input { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--fg); font-size: 14px; resize: none; outline: none; }
+  #input:focus { border-color: var(--accent); }
+  #send { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-size: 14px; }
+  #send:disabled { opacity: 0.5; cursor: not-allowed; }
+  #login { position: fixed; inset: 0; background: rgba(13,17,23,.92); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 360px; }
+  .card h2 { font-size: 18px; margin-bottom: 6px; }
+  .card p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .card label { font-size: 12px; color: var(--muted); display: block; margin: 10px 0 4px; }
+  .card input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--fg); outline: none; }
+  .card input:focus { border-color: var(--accent); }
+  .card button { width: 100%; margin-top: 18px; background: var(--accent); border: none; color: #fff; border-radius: 8px; padding: 10px; cursor: pointer; }
+  .card .hint { margin-top: 12px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="card">
+    <h2>DevOps-MindAgent</h2>
+    <p>JWT 登录 · 多租户会话隔离</p>
+    <label>用户名</label>
+    <input id="username" value="demo" autocomplete="username" />
+    <label>密码</label>
+    <input id="password" type="password" value="demo1234" autocomplete="current-password" />
+    <button id="loginBtn">登录</button>
+    <div class="hint">默认演示账号 demo / demo1234</div>
+  </div>
+</div>
+
+<header style="display:none" id="header">
+  <h1>DevOps-MindAgent</h1>
+  <span class="badge">RAG + Agent 智能排查</span>
+  <span class="badge" id="mode">加载中…</span>
+  <div class="spacer"></div>
+  <button id="logout">退出登录</button>
+</header>
+<main>
+  <div class="chat" id="chat"></div>
+</main>
+<div class="quick">
+  <button onclick="ask('Redis 内存告警，连接池报错，帮我排查')">Redis 告警排查</button>
+  <button onclick="ask('order-service 500 报错，查看日志并定位')">订单服务 500</button>
+  <button onclick="ask('什么是缓存穿透，如何解决？')">缓存穿透</button>
+  <button onclick="ask('MySQL 慢查询怎么排查？')">MySQL 慢查询</button>
+</div>
+<footer>
+  <div class="inputbar">
+    <textarea id="input" rows="1" placeholder="描述故障或输入技术问题，回车发送…"></textarea>
+    <button id="send" onclick="send()">发送</button>
+  </div>
+</footer>
+<script>
+  const chat = document.getElementById("chat");
+  const input = document.getElementById("input");
+  const sendBtn = document.getElementById("send");
+  const sessionId = "demo-" + Math.random().toString(36).slice(2, 8);
+  let token = localStorage.getItem("mindagent_token");
+
+  async function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    const resp = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    if (resp.status !== 200) { alert("登录失败"); return; }
+    const data = await resp.json();
+    token = data.access_token;
+    localStorage.setItem("mindagent_token", token);
+    enterApp();
+  }
+
+  async function enterApp() {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("header").style.display = "flex";
+    try {
+      const r = await fetch("/api/health", { headers: authHeaders() });
+      const d = await r.json();
+      document.getElementById("mode").textContent =
+        "模式: " + d.mode + " | 存储: " + d.kv + (d.db !== "none" ? "/" + d.db : "") +
+        " | 向量: " + d.vector + " | 文档: " + d.docs + " | 工具: " + d.tools.join(", ");
+    } catch (e) { document.getElementById("mode").textContent = "健康检查失败"; }
+    input.focus();
+  }
+
+  function authHeaders(extra = {}) {
+    return { "Content-Type": "application/json", "Authorization": "Bearer " + token, ...extra };
+  }
+
+  function handleAuth(resp) {
+    if (resp.status === 401) {
+      token = null; localStorage.removeItem("mindagent_token");
+      document.getElementById("login").style.display = "flex";
+      document.getElementById("header").style.display = "none";
+      return true;
+    }
+    return false;
+  }
+
+  function addRow(role) {
+    const row = document.createElement("div");
+    row.className = "row " + role;
+    const label = document.createElement("div");
+    label.className = "role";
+    label.textContent = role === "user" ? "你" : "MindAgent";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    row.appendChild(label);
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+    return { row, bubble };
+  }
+
+  function addLine(cls, text) {
+    const div = document.createElement("div");
+    div.className = cls;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  async function ask(text) {
+    input.value = text;
+    await send();
+  }
+
+  async function send() {
+    const text = input.value.trim();
+    if (!text || sendBtn.disabled) return;
+    input.value = "";
+    sendBtn.disabled = true;
+
+    addRow("user").bubble.textContent = text;
+
+    let cur = null;
+    let curBubble = null;
+    const finish = () => {
+      if (curBubble) {
+        curBubble.textContent = cur;
+        const cursor = curBubble.querySelector(".cursor");
+        if (cursor) cursor.remove();
+      }
+      cur = null; curBubble = null;
+    };
+
+    try {
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ message: text, session_id: sessionId })
+      });
+      if (handleAuth(resp)) return;
+      if (resp.status === 429) { addLine("err", "请求过于频繁，请稍后再试（限流触发）。"); return; }
+      if (resp.status !== 200) { addLine("err", "请求失败: HTTP " + resp.status); return; }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop();
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data:")) continue;
+          let ev;
+          try { ev = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
+          if (ev.type === "info") addLine("info", "ℹ " + ev.content);
+          else if (ev.type === "thought") addLine("thought", "🧠 " + ev.content);
+          else if (ev.type === "tool_result") {
+            const card = document.createElement("div");
+            card.className = "toolcard";
+            card.innerHTML = "<span class='tname'>🛠 " + ev.name + "</span><pre></pre>";
+            card.querySelector("pre").textContent = ev.content;
+            chat.appendChild(card);
+            chat.scrollTop = chat.scrollHeight;
+          }
+          else if (ev.type === "token") {
+            if (!cur) { const a = addRow("assistant"); cur = ""; curBubble = a.bubble; }
+            cur += ev.content;
+            curBubble.textContent = cur + "▌";
+            chat.scrollTop = chat.scrollHeight;
+          }
+          else if (ev.type === "error") { finish(); addLine("err", "⚠ " + ev.content); }
+          else if (ev.type === "done") {
+            finish();
+            const tag = document.createElement("div");
+            tag.className = "info";
+            tag.textContent = "⏱ " + ev.latency_ms + "ms | req=" + (ev.request_id || "").slice(0, 8) +
+              (ev.cached ? " | 语义缓存命中" : "") + (ev.tools.length ? " | 工具: " + ev.tools.join(", ") : "");
+            chat.appendChild(tag);
+          }
+        }
+      }
+      finish();
+    } catch (err) {
+      finish();
+      addLine("err", "⚠ 请求失败: " + err);
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", login);
+  document.getElementById("username").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+  document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+  document.getElementById("logout").addEventListener("click", () => {
+    token = null; localStorage.removeItem("mindagent_token");
+    document.getElementById("login").style.display = "flex";
+    document.getElementById("header").style.display = "none";
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  if (token) enterApp(); else document.getElementById("login").style.display = "flex";
+</script>
+</body>
+</html>
